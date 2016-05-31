@@ -44,12 +44,17 @@ outfile.write('time'+'\t'+'isreply'+'\t'+'start_dist_id'+'\t'+'dest_dist_id'+'\t
 				+'temperature'+'\t'+'pm'+'\n')
 #count reply
 count = 0
+
 for root, dirnames, files in os.walk(order_path):
 	for fname in files:
 		names = fname.split('_')
 		orderfile = open(root+'/'+fname,'r')
 		weatherfile = open(weather_path+'/'+weather_prefix+'_'+names[-1],'r')
 		trafficfile = open(traffic_path+'/'+traffic_prefix+'_'+names[-1],'r')
+
+		#每次写入1000行，提高写入速度
+		countLine = 0
+		multi_lines = ''
 
 		weather_dict = dict()
 		#get weather info
@@ -79,7 +84,7 @@ for root, dirnames, files in os.walk(order_path):
 		for line in orderfile:
 			items = line.split('\t')   #order_id	driver_id	passenger_id	start_district_hash	dest_district_hash	Price	Time
 			isreply = 0
-			if items[1] != 'null':   #driverid
+			if items[1] != 'NULL':   #driverid
 				isreply = 1
 			if isreply == 0:
 				count += 1
@@ -90,7 +95,7 @@ for root, dirnames, files in os.walk(order_path):
 			try:
 				dest_dist_id = dist_dict[items[4]]
 			except KeyError, v:
-				dest_dist_id = 'null'
+				dest_dist_id = 'NULL'
 			price = items[5]
 			try:
 				t = datetime.datetime.strptime(items[6].strip('\n'),"%Y-%m-%d %H:%M:%S")
@@ -102,7 +107,7 @@ for root, dirnames, files in os.walk(order_path):
 			#traffic
 			traffic_temp = filter(lambda x:x[0][0]==items[3], traffic_dict.items())
 			for traf in traffic_temp:
-				if (t-traf[0][1]).seconds < 600:
+				if (t-traf[0][1]).seconds < 600: #相差10分钟以内
 					traffic = traffic_dict[(items[3],traf[0][1])]
 					break
 
@@ -113,9 +118,18 @@ for root, dirnames, files in os.walk(order_path):
 				if (t-key).seconds < 600:  #10分钟内的天气情况
 					weather = weather_dict[key]
 					break
-
-			outfile.write(str(t)+'\t'+str(isreply)+'\t'+start_dist_id.strip('\n')+'\t'+dest_dist_id.strip('\n')+'\t'
+			#orderfile.close()
+			countLine += 1
+			multi_lines += (str(t)+'\t'+str(isreply)+'\t'+start_dist_id.strip('\n')+'\t'+dest_dist_id.strip('\n')+'\t'
 				+str(price)+'\t'+'\t'.join(poi).strip('\n')+'\t'+'\t'.join(traffic).strip('\n')+'\t'+'\t'.join(weather).strip('\n')+'\n')
+			if countLine == 1000:
+				outfile.writelines(multi_lines)
+				multi_lines = ''
+				countLine = 0
+		if countLine!=0:
+			outfile.writelines(multi_lines)
+		orderfile.close()
+
 
 print 'count',count
 
